@@ -25,3 +25,4 @@ demo/target/test-classes/ShifterTest.class
 demo/target/test-classes/TestConverter.class
 demo/target/test-classes/Word16Test.class
 demo/target/test-classes/Word32Test.class
+.vscode/settings.json

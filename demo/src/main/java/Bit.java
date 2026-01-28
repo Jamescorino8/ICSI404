@@ -2,7 +2,7 @@ public class Bit {
     private boolean value;
 
     public Bit(boolean value) {
-        this.value = value;
+        assign(value);
     }
 
     public boolean getValue() {
