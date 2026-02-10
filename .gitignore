@@ -26,3 +26,7 @@ demo/target/test-classes/TestConverter.class
 demo/target/test-classes/Word16Test.class
 demo/target/test-classes/Word32Test.class
 .vscode/settings.json
+.DS_Store
+demo/target/surefire-reports/AdderTest.txt
+.gitignore
+demo/target/surefire-reports/TEST-AdderTest.xml
