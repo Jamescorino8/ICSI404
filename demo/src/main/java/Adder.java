@@ -15,18 +15,16 @@ public class Adder {
     }
 
     public static void add(Word32 a, Word32 b, Word32 result) {   
+        Bit bitA = new Bit(false);
+        Bit bitB = new Bit(false);
         Bit carry = new Bit(false);
-        
+        Bit temp = new Bit(false);
+        Bit temp2 = new Bit(false);
         // from LSB to MSB
         for (int i = 31; i >= 0; i--) {
-            Bit bitA = new Bit(false);
-            Bit bitB = new Bit(false);
             a.getBitN(i, bitA);
             b.getBitN(i, bitB);
 
-            Bit temp = new Bit(false);
-            Bit temp2 = new Bit(false);
-            
             // bitA XOR bitB XOR carry
             Bit.xor(bitA, bitB, temp);
             Bit.xor(temp, carry, temp2);
