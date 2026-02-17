@@ -5,6 +5,7 @@ public class Shifter {
          *  source: 0000 0000 0000 0001 0001 
          *  result: 0000 0000 0000 0100 0100 (lshift by 2)
          */
+        amount = amount & 0x1F; // Only consider lowest 5 bits
         Bit currentBit = new Bit(false);
         // i = source pointer, j = result pointer
         for (int i = 31, j = 31 - amount; i >= 0 && j >= 0; i--, j--) {
@@ -19,6 +20,7 @@ public class Shifter {
          *  source: 0000 0000 0000 0001 0001 
          *  result: 0000 0000 0000 0000 0100 
          */
+        amount = amount & 0x1F; // Only consider lowest 5 bits
         Bit currentBit = new Bit(false);
         // i = source pointer, j = result pointer
         for (int i = 31 - amount, j = 31; i >= 0 && j >= 0; i--, j--) {
