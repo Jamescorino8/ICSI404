@@ -31,3 +31,5 @@ demo/target/surefire-reports/AdderTest.txt
 .gitignore
 demo/target/surefire-reports/TEST-AdderTest.xml
 demo/target/classes/TestConverter.class
+demo/target/surefire-reports/ALUTest.txt
+demo/target/surefire-reports/TEST-ALUTest.xml
