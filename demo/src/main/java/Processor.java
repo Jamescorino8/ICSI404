@@ -6,18 +6,34 @@ import java.util.Stack;
 public class Processor {
     private Memory mem;
     public List<String> output = new LinkedList<>();
+    int programCounter = 0;
+    Word16 instructionRegister;
 
     public Processor(Memory m) {
         mem = m;
     }
 
     public void run() {
+        while (!output.contains("halt")) {
+            fetch();
+            decode();
+            execute();
+            store();
+        }
     }
 
+    // read instruction from memory
     private void fetch() {
+        Word32 addr = new Word32();
+        TestConverter.fromInt(programCounter, addr);
+        mem.address = addr;
+
+        mem.read();
+        mem.value.getTopHalf(instructionRegister);
     }
 
     private void decode() {
+        
     }
 
     private void execute() {
