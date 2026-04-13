@@ -15,9 +15,12 @@ public class Processor {
     Word32 result = new Word32(); // result from execute
     ALU alu = new ALU();
     Stack<Integer> callStack = new Stack<>(); // Stack of return addresses for call/return instructions
+    int currentClockCycle = 0;
+    instructionCache instructionCache;
 
     public Processor(Memory m) {
         mem = m;
+        instructionCache = new instructionCache(m);
         instructionRegister = new Word16();
         // initialize registers
         for (int i = 0; i < 32; i++) {
@@ -36,31 +39,34 @@ public class Processor {
 
     // read instruction from memory
     private void fetch() {
-        // Clear value so null dram entries read as zero (halt)
+        // Clear value so null entries read as zero (halt)
         new Word32().copy(mem.value);
 
         Word32 addr = new Word32();
         TestConverter.fromInt(programCounter, addr);
-        mem.address = addr;
-        mem.read();
+        addr.copy(instructionCache.address);
+        instructionCache.read();
+        currentClockCycle += instructionCache.lastCost;
 
-        // If top 16 bits are zero and PC > 0, the instruction may be in the
-        // bottom half of the previous merged word (sliding-window encoding)
+        // Figure out which half holds current instruction
         Bit b = new Bit(false);
         boolean topHalfIsZero = true;
         for (int i = 0; i < 16; i++) {
-            mem.value.getBitN(i, b);
-            if (b.getValue()) { topHalfIsZero = false; break; }
+            instructionCache.value.getBitN(i, b);
+            if (b.getValue()) { 
+                topHalfIsZero = false; 
+                break; 
+            }
         }
 
         if (topHalfIsZero && programCounter > 0) {
-            new Word32().copy(mem.value);
+            new Word32().copy(instructionCache.value);
             TestConverter.fromInt(programCounter - 1, addr);
-            mem.address = addr;
-            mem.read();
-            mem.value.getBottomHalf(instructionRegister);
+            instructionCache.address = addr;
+            instructionCache.read();
+            instructionCache.value.getBottomHalf(instructionRegister);
         } else {
-            mem.value.getTopHalf(instructionRegister);
+            instructionCache.value.getTopHalf(instructionRegister);
         }
     }
 
@@ -129,6 +135,7 @@ public class Processor {
             case 0:
                 // Halt
                 output.add("halt");
+                System.out.println(currentClockCycle);
                 break;
             case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 11:
                 // ALU ops (add, subtract, multiply, shifts, bitwise, compare)
@@ -137,6 +144,7 @@ public class Processor {
                 op2.copy(alu.op2);
                 alu.doInstruction();
                 alu.result.copy(result);
+                currentClockCycle += opcode == 3 ? 10 : 2;
                 break;
             case 8:
                 // Syscall
@@ -206,12 +214,14 @@ public class Processor {
                 loadAddr.copy(mem.address);
                 mem.read();
                 mem.value.copy(result);
+                currentClockCycle += 300;
                 break;
             case 19:
                 // Store
                 op2.copy(mem.address);
                 op1.copy(mem.value);
                 mem.write();
+                currentClockCycle += 300;
                 break;
             case 20:
                 // Copy
