@@ -16,11 +16,13 @@ public class Processor {
     ALU alu = new ALU();
     Stack<Integer> callStack = new Stack<>(); // Stack of return addresses for call/return instructions
     int currentClockCycle = 0;
-    instructionCache instructionCache;
+    InstructionCache instructionCache;
+    L2Cache l2;
 
     public Processor(Memory m) {
         mem = m;
-        instructionCache = new instructionCache(m);
+        l2 = new L2Cache(m);
+        instructionCache = new InstructionCache(l2);
         instructionRegister = new Word16();
         // initialize registers
         for (int i = 0; i < 32; i++) {
@@ -40,7 +42,7 @@ public class Processor {
     // read instruction from memory
     private void fetch() {
         // Clear value so null entries read as zero (halt)
-        new Word32().copy(mem.value);
+        new Word32().copy(instructionCache.value);
 
         Word32 addr = new Word32();
         TestConverter.fromInt(programCounter, addr);
@@ -211,17 +213,17 @@ public class Processor {
                 // Load
                 Word32 loadAddr = new Word32();
                 Adder.add(op1, op2, loadAddr);
-                loadAddr.copy(mem.address);
-                mem.read();
-                mem.value.copy(result);
-                currentClockCycle += 300;
+                loadAddr.copy(l2.address);
+                l2.read();
+                l2.value.copy(result);
+                currentClockCycle += l2.lastCost;
                 break;
             case 19:
                 // Store
-                op2.copy(mem.address);
-                op1.copy(mem.value);
-                mem.write();
-                currentClockCycle += 300;
+                op2.copy(l2.address);
+                op1.copy(l2.value);
+                l2.write();
+                currentClockCycle += l2.lastCost;
                 break;
             case 20:
                 // Copy
