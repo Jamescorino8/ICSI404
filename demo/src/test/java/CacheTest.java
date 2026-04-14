@@ -14,11 +14,11 @@ public class CacheTest {
         String[] program = {
             "copy 0 r0",        // sum = 0
             "copy 10 r1",       // r1 = 10
-            "multiply 10 r1",   // r1 = 100
+            "multiply 10 r1",   // r1 = 100, countdown counter
             "add r1 r0",        // sum += counter
-            "subtract 1 r1",    // counter--
+            "subtract 1 r1",    // counter -= 1
             "compare 0 r1",     // compare 0 to counter
-            "bne -1",           // if counter!=0, loop to PC=3
+            "bne -1",           // if counter != 0, loop to PC = 3
             "syscall 0",
             "halt"
         };
@@ -32,31 +32,30 @@ public class CacheTest {
     @Test
     public void testSumArray() {
         String[] program = {
-            // Init
             "copy 10 r2",      // r2 = 10
-            "multiply 10 r2",  // r2 = 100
+            "multiply 10 r2",  // r2 = 100, count
             "copy r2 r1",      // r1 = 100
-            "add r1 r1",       // r1 = 200 (start address)
-            "copy r1 r6",      // r6 = 200 (save start for reset after fill)
+            "add r1 r1",       // r1 = 200, start address
+            "copy r1 r6",      // r6 = 200, save start address for reset after fill
             "copy r2 r5",      // r5 = 100
-            "multiply 3 r5",   // r5 = 300 (end address)
-            "copy 1 r0",       // value = 1
-            // Fill phase
-            "store r0 r1",     // [FILL LOOP] mem[addr] = value
-            "add 1 r0",        // value++
-            "add 1 r1",        // addr++
-            "subtract 1 r2",   // count--
+            "multiply 3 r5",   // r5 = 300, end address
+            "copy 1 r0",       // r0 = 1, first value to store
+            // Fill
+            "store r0 r1",     // store current value to current address, PC = 8
+            "add 1 r0",        // value to store += 1
+            "add 1 r1",        // address += 1
+            "subtract 1 r2",   // count -= 1
             "compare 0 r2",    // compare 0 to count
-            "bne -2",          // if count!=0, loop to PC=8
-            // Sum phase
-            "copy r6 r1",      // r1 = 200 (restore start addr)
-            "copy 0 r3",       // sum = 0
-            "copy r1 r4",      // [SUM LOOP] r4 = addr (copy so load doesn't destroy r1)
-            "load 0 r4",       // r4 = mem[addr]
+            "bne -2",          // if count != 0, loop to PC = 8
+            // Sum
+            "copy r6 r1",      // reset address to start address (200)
+            "copy 0 r3",       // r3 = 0, sum
+            "copy r1 r4",      // copy current address to r1, PC = 16
+            "load 0 r4",       // r4 = current address
             "add r4 r3",       // sum += value
-            "add 1 r1",        // addr++
-            "compare r5 r1",   // compare end(src=300) to addr(dst=r1)
-            "blt -2",          // if addr<300, loop to PC=16
+            "add 1 r1",        // address += 1
+            "compare r5 r1",   // compare end address to current address
+            "blt -2",          // if address < 300, loop to PC = 16
             "syscall 0",
             "halt"
         };
@@ -67,88 +66,43 @@ public class CacheTest {
         System.out.println("[testSumArray] clock cycles: " + p.currentClockCycle);
     }
 
-    // ---------------------------------------------------------------
-    // Program 3: Build a linked list of 100 nodes at addresses 200-399.
-    // Each node: mem[addr]=value, mem[addr+1]=next_addr (0 for last node).
-    // Traverse and sum all values. Result in r3.
-    //
-    // --- Init (PC 0-6) ---
-    // PC=0  copy 10 r2       r2 = 10
-    // PC=1  multiply 10 r2   r2 = 100
-    // PC=2  copy r2 r1       r1 = 100
-    // PC=3  add r1 r1        r1 = 200 (start / head address)
-    // PC=4  copy r1 r6       r6 = 200 (save head for traversal reset)
-    // PC=5  subtract 1 r2    r2 = 99 (build count: last node handled separately)
-    // PC=6  copy 1 r0        value = 1
-    //
-    // --- Build 99 nodes with valid next pointers (PC 7-16) ---
-    // PC=7  store r0 r1      [BUILD LOOP, odd PC] mem[addr] = value
-    // PC=8  copy r1 r3       r3 = addr
-    // PC=9  add 2 r3         r3 = addr+2 (next node address)
-    // PC=10 add 1 r1         r1 = addr+1 (next pointer slot)
-    // PC=11 store r3 r1      mem[addr+1] = next node address
-    // PC=12 add 1 r1         r1 = addr+2 (advance to next node)
-    // PC=13 add 1 r0         value++
-    // PC=14 subtract 1 r2    count--
-    // PC=15 compare 0 r2     op1=r2(count), op2=0
-    // PC=16 bne -4           if count!=0, loop: 16+2(-4)-1=7 (even->odd) ✓
-    //
-    // --- Last node at addr=398, value=100 (PC 17-19) ---
-    // PC=17 store r0 r1      mem[398] = 100
-    // PC=18 add 1 r1         r1 = 399 (next pointer slot)
-    // PC=19 store 0 r1       mem[399] = 0 (null terminator, immediate mode)
-    //
-    // --- Traverse and sum (PC 20-31) ---
-    // PC=20 copy r6 r1       r1 = 200 (head)
-    // PC=21 copy 0 r3        sum = 0
-    // PC=22 copy r1 r4       [SUM LOOP, even PC] r4 = node addr
-    // PC=23 load 0 r4        r4 = value at node  (r1 unchanged)
-    // PC=24 add r4 r3        sum += value
-    // PC=25 add 1 r1         r1 = addr+1 (next pointer slot)
-    // PC=26 load 0 r1        r1 = next node address (follows the pointer)
-    // PC=27 compare 0 r1     op1=r1(next), op2=0: equal if null
-    // PC=28 copy r3 r3       nop (parity pad: makes branch land on even PC=22)
-    // PC=29 bne -3           if next!=0, loop: 29+2(-3)-1=22 (odd->even) ✓
-    // PC=30 syscall 0
-    // PC=31 halt
-    // ---------------------------------------------------------------
+    // Build a linked list of 100 nodes at addresses 200-399.
     @Test
     public void testSumLinkedList() {
         String[] program = {
-            // Init
             "copy 10 r2",      // r2 = 10
             "multiply 10 r2",  // r2 = 100
             "copy r2 r1",      // r1 = 100
-            "add r1 r1",       // r1 = 200 (head address)
-            "copy r1 r6",      // r6 = 200 (save head for traversal)
-            "subtract 1 r2",   // r2 = 99 (build loop count)
-            "copy 1 r0",       // value = 1
+            "add r1 r1",       // r1 = 200, address of head node
+            "copy r1 r6",      // r6 = 200, save head node for traversal
+            "subtract 1 r2",   // r2 = 99, build loop count
+            "copy 1 r0",       // r0 = 1, value to store
             // Build 99 nodes with next pointers
-            "store r0 r1",     // [BUILD LOOP] mem[addr] = value
-            "copy r1 r3",      // r3 = addr
-            "add 2 r3",        // r3 = addr+2 (next node)
-            "add 1 r1",        // r1 = addr+1 (next ptr slot)
-            "store r3 r1",     // mem[addr+1] = next node addr
-            "add 1 r1",        // r1 = addr+2 (next node)
-            "add 1 r0",        // value++
-            "subtract 1 r2",   // count--
+            "store r0 r1",     // current address = current value, PC = 7
+            "copy r1 r3",      // save current node address before incremented into r3
+            "add 2 r3",        // r3 = address of next node (+2 ahead)
+            "add 1 r1",        // r1 = address of next pointer slot
+            "store r3 r1",     // store next node's address to pointer slot
+            "add 1 r1",        // r1 += 1, start of next node
+            "add 1 r0",        // current value += 1
+            "subtract 1 r2",   // count -= 1
             "compare 0 r2",    // compare 0 to count
-            "bne -4",          // if count!=0, loop to PC=7
-            // Last node (addr=398, value=100)
-            "store r0 r1",     // mem[398] = 100
-            "add 1 r1",        // r1 = 399 (next ptr slot)
-            "store 0 r1",      // mem[399] = 0 (null, immediate mode)
+            "bne -4",          // if count != 0, loop to PC=7
+            // Last node
+            "store r0 r1",     // store final value
+            "add 1 r1",        // r1 += 1, pointer slot of last node
+            "store 0 r1",      // write null terminator using immediate mode
             // Traverse and sum
-            "copy r6 r1",      // r1 = 200 (head)
+            "copy r6 r1",      // reset r1 to head address
             "copy 0 r3",       // sum = 0
-            "copy r1 r4",      // [SUM LOOP] r4 = node addr (copy before load destroys r4)
+            "copy r1 r4",      // copy current address to r4, PC = 22
             "load 0 r4",       // r4 = node value
             "add r4 r3",       // sum += value
-            "add 1 r1",        // r1 = addr+1 (next ptr slot)
-            "load 0 r1",       // r1 = next node addr (follows pointer)
-            "compare 0 r1",    // compare 0 to next (equal if null)
-            "copy r3 r3",      // nop (parity padding)
-            "bne -3",          // if next!=0, loop to PC=22
+            "add 1 r1",        // r1 = current address + 1, next pointer
+            "load 0 r1",       // load next node address
+            "compare 0 r1",    // compare 0 to next node address
+            "copy r3 r3",      // NOP, shifts bne to PC = 29 (odd) to land exactly on PC = 22 (even)
+            "bne -3",          // if next node address != 0, loop to PC = 22
             "syscall 0",
             "halt"
         };
