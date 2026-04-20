@@ -25,6 +25,8 @@ public class Memory {
         if (index < 0 || index >= dram.length) throw new IndexOutOfBoundsException("Address out of bounds: " + index);
         if (dram[index] != null) {
             dram[index].copy(value);
+        } else {
+            new Word32().copy(value);
         }
     }
 
