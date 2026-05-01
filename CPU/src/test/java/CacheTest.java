@@ -9,10 +9,11 @@ public class CacheTest {
             "copy 0 r0",        // sum = 0
             "copy 10 r1",       // r1 = 10
             "multiply 10 r1",   // r1 = 100, countdown counter
-            "add r1 r0",        // sum += counter
+            "copy r1 r1",       // NOP: align loop to addr 2 (even index)
+            "add r1 r0",        // sum += counter  ← addr 2, top
             "subtract 1 r1",    // counter -= 1
             "compare 0 r1",     // compare 0 to counter
-            "bne -1",           // if counter != 0, loop to PC = 3
+            "bne -1",           // if counter != 0, loop to addr 2
             "syscall 0",
             "halt"
         };
@@ -71,8 +72,9 @@ public class CacheTest {
             "copy r1 r6",      // r6 = 200, save head node for traversal
             "subtract 1 r2",   // r2 = 99, build loop count
             "copy 1 r0",       // r0 = 1, value to store
+            "copy r0 r0",      // NOP: align build loop to addr 4 (even index)
             // Build 99 nodes with next pointers
-            "store r0 r1",     // current address = current value, PC = 7
+            "store r0 r1",     // current address = current value, addr 4
             "copy r1 r3",      // save current node address before incremented into r3
             "add 2 r3",        // r3 = address of next node (+2 ahead)
             "add 1 r1",        // r1 = address of next pointer slot
@@ -81,7 +83,7 @@ public class CacheTest {
             "add 1 r0",        // current value += 1
             "subtract 1 r2",   // count -= 1
             "compare 0 r2",    // compare 0 to count
-            "bne -4",          // if count != 0, loop to PC=7
+            "bne -4",          // if count != 0, loop to addr 4
             // Last node
             "store r0 r1",     // store final value
             "add 1 r1",        // r1 += 1, pointer slot of last node
@@ -89,7 +91,8 @@ public class CacheTest {
             // Traverse and sum
             "copy r6 r1",      // reset r1 to head address
             "copy 0 r3",       // sum = 0
-            "copy r1 r4",      // copy current address to r4, PC = 22
+            "copy r0 r0",      // NOP: align traversal loop to addr 12 (even index)
+            "copy r1 r4",      // copy current address to r4, addr 12
             "load 0 r4",       // r4 = node value
             "add r4 r3",       // sum += value
             "add 1 r1",        // r1 = current address + 1, next pointer

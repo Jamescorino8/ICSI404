@@ -1,3 +1,4 @@
 CPU/target/*
 .vscode/settings.json
 .DS_Store
+*.pages

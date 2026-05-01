@@ -16,15 +16,22 @@ public class Processor {
     ALU alu = new ALU();
     Stack<Integer> callStack = new Stack<>(); // Stack of return addresses for call/return instructions
     int currentClockCycle = 0;
+    boolean toggle = false; // false = use top half, true = use bottom half
+    Word32 cachedWord = new Word32(); // holds the last fetched Word32 so bottom half reuses it
     InstructionCache instructionCache;
     L2Cache l2;
+    public int cacheMode = 4; // 1=no cache, 2=IC only, 3=IC+L2 instr only, 4=IC+L2 both
 
     public Processor(Memory m) {
+        this(m, 4);
+    }
+
+    public Processor(Memory m, int mode) {
         mem = m;
+        cacheMode = mode;
         l2 = new L2Cache(m);
-        instructionCache = new InstructionCache(l2);
+        instructionCache = (mode == 2) ? new InstructionCache(m) : new InstructionCache(l2);
         instructionRegister = new Word16();
-        // initialize registers
         for (int i = 0; i < 32; i++) {
             registers[i] = new Word32();
         }
@@ -41,34 +48,26 @@ public class Processor {
 
     // read instruction from memory
     private void fetch() {
-        // Clear value so null entries read as zero (halt)
-        new Word32().copy(instructionCache.value);
-
-        Word32 addr = new Word32();
-        TestConverter.fromInt(programCounter, addr);
-        addr.copy(instructionCache.address);
-        instructionCache.read();
-        currentClockCycle += instructionCache.lastCost;
-
-        // Figure out which half holds current instruction
-        Bit b = new Bit(false);
-        boolean topHalfIsZero = true;
-        for (int i = 0; i < 16; i++) {
-            instructionCache.value.getBitN(i, b);
-            if (b.getValue()) { 
-                topHalfIsZero = false; 
-                break; 
+        if (!toggle) {
+            if (cacheMode == 1) {
+                Word32 addr = new Word32();
+                TestConverter.fromInt(programCounter, addr);
+                addr.copy(mem.address);
+                mem.read();
+                currentClockCycle += 300;
+                mem.value.copy(cachedWord);
+            } else {
+                new Word32().copy(instructionCache.value);
+                Word32 addr = new Word32();
+                TestConverter.fromInt(programCounter, addr);
+                addr.copy(instructionCache.address);
+                instructionCache.read();
+                currentClockCycle += instructionCache.lastCost;
+                instructionCache.value.copy(cachedWord);
             }
-        }
-
-        if (topHalfIsZero && programCounter > 0) {
-            new Word32().copy(instructionCache.value);
-            TestConverter.fromInt(programCounter - 1, addr);
-            instructionCache.address = addr;
-            instructionCache.read();
-            instructionCache.value.getBottomHalf(instructionRegister);
+            cachedWord.getTopHalf(instructionRegister);
         } else {
-            instructionCache.value.getTopHalf(instructionRegister);
+            cachedWord.getBottomHalf(instructionRegister);
         }
     }
 
@@ -159,7 +158,7 @@ public class Processor {
             case 9:
                 // Call: Pushes the current address + 1 on the stack. Sets PC to PC + Immediate
                 callStack.push(programCounter + 1);
-                programCounter = programCounter + 2 * TestConverter.toInt(op1) - 1;
+                programCounter = programCounter + TestConverter.toInt(op1);
                 pcUpdated = true;
                 break;
             case 10:
@@ -170,42 +169,42 @@ public class Processor {
             case 12:
                 // BLE
                 if (alu.less.getValue() || alu.equal.getValue()) {
-                    programCounter += 2 * TestConverter.toInt(op1) - 1;
+                    programCounter += TestConverter.toInt(op1);
                     pcUpdated = true;
                 }
                 break;
             case 13:
                 // BLT
                 if (alu.less.getValue()) {
-                    programCounter += 2 * TestConverter.toInt(op1) - 1;
+                    programCounter += TestConverter.toInt(op1);
                     pcUpdated = true;
                 }
                 break;
             case 14:
                 // BGE
                 if (!alu.less.getValue()) {
-                    programCounter += 2 * TestConverter.toInt(op1) - 1;
+                    programCounter += TestConverter.toInt(op1);
                     pcUpdated = true;
                 }
                 break;
             case 15:
                 // BGT
                 if (!alu.less.getValue() && !alu.equal.getValue()) {
-                    programCounter += 2 * TestConverter.toInt(op1) - 1;
+                    programCounter += TestConverter.toInt(op1);
                     pcUpdated = true;
                 }
                 break;
             case 16:
                 // BEQ
                 if (alu.equal.getValue()) {
-                    programCounter += 2 * TestConverter.toInt(op1) - 1;
+                    programCounter += TestConverter.toInt(op1);
                     pcUpdated = true;
                 }
                 break;
             case 17:
                 // BNE
                 if (!alu.equal.getValue()) {
-                    programCounter += 2 * TestConverter.toInt(op1) - 1;
+                    programCounter += TestConverter.toInt(op1);
                     pcUpdated = true;
                 }
                 break;
@@ -213,17 +212,31 @@ public class Processor {
                 // Load
                 Word32 loadAddr = new Word32();
                 Adder.add(op1, op2, loadAddr);
-                loadAddr.copy(l2.address);
-                l2.read();
-                l2.value.copy(result);
-                currentClockCycle += l2.lastCost;
+                if (cacheMode < 4) {
+                    loadAddr.copy(mem.address);
+                    mem.read();
+                    mem.value.copy(result);
+                    currentClockCycle += 300;
+                } else {
+                    loadAddr.copy(l2.address);
+                    l2.read();
+                    l2.value.copy(result);
+                    currentClockCycle += l2.lastCost;
+                }
                 break;
             case 19:
                 // Store
-                op2.copy(l2.address);
-                op1.copy(l2.value);
-                l2.write();
-                currentClockCycle += l2.lastCost;
+                if (cacheMode < 4) {
+                    op2.copy(mem.address);
+                    op1.copy(mem.value);
+                    mem.write();
+                    currentClockCycle += 300;
+                } else {
+                    op2.copy(l2.address);
+                    op1.copy(l2.value);
+                    l2.write();
+                    currentClockCycle += l2.lastCost;
+                }
                 break;
             case 20:
                 // Copy
@@ -262,7 +275,12 @@ public class Processor {
                 result.copy(registers[opB]);
                 break;
         }
-        if (!pcUpdated) {
+        if (pcUpdated) {
+            toggle = false;
+        } else if (!toggle) {
+            toggle = true;
+        } else {
+            toggle = false;
             programCounter++;
         }
     }

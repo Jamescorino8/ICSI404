@@ -130,10 +130,10 @@ public class Assembler {
             lines = withHalt;
         }
 
-        // Merge lines
-        String[] merged = new String[lines.length - 1];
-        for (int i = 0; i < lines.length - 1; i++) {
-            merged[i] = lines[i] + lines[i + 1];
+        // Merge non-overlapping pairs
+        String[] merged = new String[lines.length / 2];
+        for (int i = 0; i < lines.length / 2; i++) {
+            merged[i] = lines[2 * i] + lines[2 * i + 1];
         }
         return merged;
     }
